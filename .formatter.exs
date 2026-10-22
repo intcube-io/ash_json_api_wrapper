@@ -14,6 +14,7 @@ spark_locals_without_parens = [
   field: 2,
   fields_in: 1,
   filter_handler: 1,
+  filter_operators: 1,
   get_endpoint: 2,
   get_endpoint: 3,
   limit_with: 1,

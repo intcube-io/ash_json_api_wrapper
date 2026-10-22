@@ -4,7 +4,14 @@
 
 defmodule AshJsonApiWrapper.Field do
   @moduledoc "Represents a field mapped in the target api."
-  defstruct [:name, :path, :write_path, :filter_handler, __spark_metadata__: nil]
+  defstruct [
+    :name,
+    :path,
+    :write_path,
+    :filter_handler,
+    :filter_operators,
+    __spark_metadata__: nil
+  ]
 
   @type t :: %__MODULE__{}
 
@@ -33,6 +40,12 @@ defmodule AshJsonApiWrapper.Field do
         * `{:simple, "key" | ["path", "to", "key"]}` - Sets the value directly into the query params using the provided key.
         * `{:place_in_list, ["path", "to", "list"]}` - Supports `or equals` and `in` filters over the given field, by placing their values in the provided list.
         * `{:place_in_csv_list, ["path", "to", "list"]}` - Supports `or equals` and `in` filters over the given field, by placing their values in the provided list.
+        """
+      ],
+      filter_operators: [
+        type: {:list, :atom},
+        doc: """
+        The only operators and functions filters over this field may use, by their Ash name, e.g. `[:==, :in, :contains]`. Other filters over the field are rejected before any request is made, whatever the dialect supports.
         """
       ]
     ]

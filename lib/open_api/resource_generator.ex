@@ -52,7 +52,11 @@ defmodule AshJsonApiWrapper.OpenApi.ResourceGenerator do
   | `object`, or anything else | `:map` |
 
   Properties listed in the schema's `required` that are not `nullable` get `allow_nil? false`.
+
+  The first read and the first create are primary actions.
   """
+
+  alias AshJsonApiWrapper.Dialect.Naming
 
   @wrappers ["data", "items", "value", "values", "results", "records", "objects", "entries"]
 
@@ -99,14 +103,43 @@ defmodule AshJsonApiWrapper.OpenApi.ResourceGenerator do
           """
         end)
 
+      # The first read and the first create are primary, so they are used by default and for
+      # loading relationships.
+      primary_operations =
+        operations
+        |> Enum.uniq_by(fn {_path, _method, _operation, type} -> type end)
+        |> Enum.map(fn {_path, _method, operation, _type} -> operation end)
+
       actions =
         Enum.map_join(operations, "\n\n", fn {_path, _method, operation, type} ->
-          """
-          #{type} :#{operation_id(operation)}
-          """
+          if operation in primary_operations do
+            """
+            #{type} :#{operation_id(operation)} do
+              primary? true
+            end
+            """
+          else
+            """
+            #{type} :#{operation_id(operation)}
+            """
+          end
         end)
 
-      properties = properties(json, config, reads)
+      schema = json |> object(config, reads) |> all_of(json)
+      overrides = overrides(schema, config, resource)
+
+      properties =
+        schema
+        |> Map.get("properties", %{})
+        |> Enum.reject(fn {name, property} ->
+          name in overrides.skip || property["x-ash-skip"] == true
+        end)
+        |> Enum.sort_by(&elem(&1, 0))
+        |> Enum.map(fn {name, property} ->
+          {Map.get(overrides.names, name, attribute_name(name)), name, deref(json, property)}
+        end)
+
+      dialect_opts = naming_opts(dialect, dialect_opts, properties)
 
       field_configs =
         Enum.map(config[:fields] || [], fn {name, field_config} ->
@@ -115,28 +148,54 @@ defmodule AshJsonApiWrapper.OpenApi.ResourceGenerator do
 
       fields =
         properties
-        |> Enum.map(fn {name, _property} -> name end)
-        |> Enum.concat(Enum.map(field_configs, &elem(&1, 0)))
-        |> Enum.uniq()
-        |> Enum.flat_map(fn name ->
-          field_config = find_field_config(field_configs, name)
+        |> Enum.map(fn {attribute, name, _property} -> {attribute, name} end)
+        |> Enum.concat(
+          for {name, _} <- field_configs,
+              !Enum.any?(properties, fn {attribute, original, _} ->
+                name in [attribute, original]
+              end),
+              do: {attribute_name(name), name}
+        )
+        |> Enum.flat_map(fn {attribute, name} ->
+          field_config =
+            find_field_config(field_configs, attribute) || find_field_config(field_configs, name) ||
+              []
+
+          operators = overrides.filterable && overrides.filterable[name]
 
           filter_handler =
-            if field_config[:filter_handler] do
-              "filter_handler #{inspect(field_config[:filter_handler])}"
+            cond do
+              field_config[:filter_handler] ->
+                "filter_handler #{inspect(field_config[:filter_handler])}"
+
+              simple? && operators && Enum.any?(operators, &(&1 in [:==, :in])) ->
+                if attribute == name do
+                  "filter_handler :simple"
+                else
+                  "filter_handler {:simple, #{inspect(name)}}"
+                end
+
+              true ->
+                nil
+            end
+
+          filter_operators =
+            if operators do
+              "filter_operators #{inspect(operators)}"
             end
 
           path =
-            if simple? && attribute_name(name) != name do
+            if simple? && attribute != name do
               "path #{inspect(name)}"
             end
 
-          if filter_handler || path do
+          if filter_handler || filter_operators || path do
             [
               """
-              field :#{attribute_name(name)} do
+              field :#{attribute} do
                 #{path}
                 #{filter_handler}
+                #{filter_operators}
               end
               """
             ]
@@ -157,18 +216,12 @@ defmodule AshJsonApiWrapper.OpenApi.ResourceGenerator do
             """
         end
 
-      required = required(json, config, reads)
+      required = Map.get(schema, "required", [])
 
       attributes =
         properties
-        |> Enum.map(fn {name, property} ->
-          {attribute_name(name), name, property}
-        end)
-        |> Enum.sort_by(fn {name, _, _} ->
-          name not in List.wrap(config[:primary_key])
-        end)
+        |> Enum.sort_by(fn {_attribute, name, _} -> name not in overrides.primary_key end)
         |> Enum.map_join("\n\n", fn {name, original_name, property} ->
-          property = deref(json, property)
           type = type(json, property)
 
           constraints =
@@ -193,10 +246,16 @@ defmodule AshJsonApiWrapper.OpenApi.ResourceGenerator do
 
           constraints = if type == ":string" || type == ":atom", do: constraints
 
-          primary_key? = name in List.wrap(config[:primary_key])
+          primary_key? = original_name in overrides.primary_key
           required? = original_name in required && !nullable?(property)
 
-          if constraints || primary_key? || required? do
+          filterable =
+            if overrides.filterable && !Map.has_key?(overrides.filterable, original_name) &&
+                 !primary_key? && original_name not in overrides.relationship_attributes do
+              "filterable? false"
+            end
+
+          if constraints || primary_key? || required? || filterable do
             constraints =
               if constraints do
                 "constraints #{constraints}"
@@ -220,6 +279,7 @@ defmodule AshJsonApiWrapper.OpenApi.ResourceGenerator do
             """
             attribute :#{name}, #{type} do
               #{allow_nil}
+              #{filterable}
               #{constraints}
             end
             """
@@ -229,6 +289,19 @@ defmodule AshJsonApiWrapper.OpenApi.ResourceGenerator do
             """
           end
         end)
+
+      relationships =
+        case Enum.map_join(overrides.relationships, "\n\n", &relationship(&1, properties)) do
+          "" ->
+            ""
+
+          relationships ->
+            """
+            relationships do
+              #{relationships}
+            end
+            """
+        end
 
       tesla =
         if main_config[:tesla] do
@@ -273,6 +346,8 @@ defmodule AshJsonApiWrapper.OpenApi.ResourceGenerator do
           attributes do
             #{attributes}
           end
+
+          #{relationships}
         end
         """
         |> Code.format_string!(locals_without_parens: locals_without_parens())
@@ -307,9 +382,167 @@ defmodule AshJsonApiWrapper.OpenApi.ResourceGenerator do
   end
 
   defp find_field_config(field_configs, name) do
-    Enum.find_value(field_configs, [], fn {field_name, config} ->
-      if field_name == name || field_name == attribute_name(name), do: config
+    Enum.find_value(field_configs, fn {field_name, config} ->
+      if field_name == name, do: config
     end)
+  end
+
+  # Overrides from the config and from `x-ash-*` extensions in the spec, by property name. The
+  # config wins.
+  # sobelow_skip ["DOS.StringToAtom"]
+  defp overrides(schema, config, resource) do
+    properties = Map.get(schema, "properties", %{})
+    property = &property_name!(properties, &1, &2, resource)
+
+    extension_names =
+      for {name, %{"x-ash-name" => attribute}} <- properties, into: %{}, do: {name, attribute}
+
+    config_names =
+      for {key, attribute} <- config[:rename] || [],
+          into: %{},
+          do: {property.(key, :rename), to_string(attribute)}
+
+    extension_operators =
+      for {name, %{"x-ash-filter-operators" => operators}} <- properties,
+          into: %{},
+          do: {name, Enum.map(operators, &String.to_atom/1)}
+
+    config_operators =
+      for {key, operators} <- config[:filterable] || [],
+          into: %{},
+          do: {property.(key, :filterable), operators}
+
+    filterable =
+      if config[:filterable] || extension_operators != %{} do
+        Map.merge(extension_operators, config_operators)
+      end
+
+    primary_key =
+      (config[:primary_key] || schema["x-ash-primary-key"])
+      |> List.wrap()
+      |> Enum.map(&property.(&1, :primary_key))
+
+    extension_relationships =
+      Enum.concat(
+        for {name, %{"x-ash-relationship" => relationship}} <- properties do
+          Map.put_new(relationship, "source_attribute", name)
+        end,
+        schema["x-ash-relationships"] || []
+      )
+      |> Enum.map(fn relationship ->
+        {relationship["name"], Enum.map(Map.delete(relationship, "name"), &relationship_opt/1)}
+      end)
+
+    relationships =
+      extension_relationships
+      |> Keyword.new(fn {name, opts} -> {String.to_atom(name), opts} end)
+      |> Keyword.merge(config[:relationships] || [])
+      |> Enum.map(fn {name, opts} ->
+        opts =
+          case opts[:source_attribute] do
+            nil -> opts
+            source -> Keyword.put(opts, :source_attribute, property.(source, :relationships))
+          end
+
+        {name, opts}
+      end)
+
+    %{
+      relationship_attributes:
+        Enum.flat_map(relationships, &List.wrap(elem(&1, 1)[:source_attribute])),
+      skip: Enum.map(config[:skip] || [], &property.(&1, :skip)),
+      names: Map.merge(extension_names, config_names),
+      filterable: filterable,
+      primary_key: primary_key,
+      relationships: relationships
+    }
+  end
+
+  # sobelow_skip ["DOS.StringToAtom"]
+  defp relationship_opt({"type", type}), do: {:type, String.to_atom(type)}
+  # sobelow_skip ["DOS.StringToAtom"]
+  defp relationship_opt({key, value}), do: {String.to_atom(key), value}
+
+  defp property_name!(properties, key, override, resource) do
+    key = to_string(key)
+
+    Enum.find(Map.keys(properties), &(&1 == key)) ||
+      Enum.find(Map.keys(properties), &(attribute_name(&1) == key)) ||
+      raise ArgumentError, """
+      #{inspect_module(resource)}: `#{override}` names #{inspect(key)}, which is not a property of the entity schema.
+
+      Properties: #{properties |> Map.keys() |> Enum.sort() |> Enum.join(", ")}
+      """
+  end
+
+  defp relationship({name, opts}, properties) do
+    type = opts[:type] || :belongs_to
+
+    destination =
+      inspect_module(opts[:destination] || raise("Relationship #{name} needs a destination"))
+
+    body =
+      case type do
+        :belongs_to ->
+          source_name = opts[:source_attribute]
+
+          source =
+            Enum.find_value(properties, "#{name}_id", fn {attribute, original, _} ->
+              if original == source_name, do: attribute
+            end)
+
+          """
+          source_attribute :#{source}
+          define_attribute? false
+          """
+
+        _ ->
+          destination_attribute =
+            opts[:destination_attribute] ||
+              raise "Relationship #{name} needs a destination_attribute"
+
+          "destination_attribute :#{destination_attribute}"
+      end
+
+    """
+    #{type} :#{name}, #{destination} do
+      #{body}
+    end
+    """
+  end
+
+  # sobelow_skip ["DOS.StringToAtom"]
+  defp naming_opts(AshJsonApiWrapper.Dialect.OData, opts, properties) do
+    explicit =
+      for {attribute, name, _} <- properties,
+          Naming.remote_name(String.to_atom(attribute), opts[:property_case] || :camel, []) !=
+            name,
+          do: {String.to_atom(attribute), name}
+
+    merge_names(opts, :properties, explicit)
+  end
+
+  # sobelow_skip ["DOS.StringToAtom"]
+  defp naming_opts(AshJsonApiWrapper.Dialect.CubeJs, opts, properties) do
+    cube = opts[:cube]
+
+    explicit =
+      for {attribute, name, _} <- properties,
+          member = if(String.contains?(name, "."), do: name, else: "#{cube}.#{name}"),
+          default =
+            "#{cube}.#{Naming.remote_name(String.to_atom(attribute), opts[:member_case] || :camel, [])}",
+          member != default,
+          do: {String.to_atom(attribute), member}
+
+    merge_names(opts, :members, explicit)
+  end
+
+  defp naming_opts(_dialect, opts, _properties), do: opts
+
+  defp merge_names(opts, _key, []), do: opts
+
+  defp merge_names(opts, key, explicit) do
+    Keyword.update(opts, key, explicit, &Keyword.merge(explicit, &1))
   end
 
   # `createdAt` becomes `created_at`, `Sales.region` becomes `region`.
@@ -415,21 +648,6 @@ defmodule AshJsonApiWrapper.OpenApi.ResourceGenerator do
       entity_schema(json, reads) ||
         raise "Could not find the entity schema of #{inspect(config[:path])}, set `object_type`"
     end
-  end
-
-  defp properties(json, config, reads) do
-    json
-    |> object(config, reads)
-    |> all_of(json)
-    |> Map.get("properties", %{})
-    |> Enum.sort_by(&elem(&1, 0))
-  end
-
-  defp required(json, config, reads) do
-    json
-    |> object(config, reads)
-    |> all_of(json)
-    |> Map.get("required", [])
   end
 
   # Merges the properties of `allOf` schemas.
