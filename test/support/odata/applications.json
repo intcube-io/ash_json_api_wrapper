@@ -1,0 +1,12 @@
+{
+  "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#applications",
+  "value": [
+    {
+      "id": "03ef14b0-ca33-4840-8f4f-d6e91916010e",
+      "appId": "631a96bc-a705-4eda-9f99-fdaf9f54f6a2",
+      "displayName": "Reporting tool",
+      "signInAudience": "AzureADMyOrg",
+      "createdDateTime": "2024-04-08T07:20:00Z"
+    }
+  ]
+}
