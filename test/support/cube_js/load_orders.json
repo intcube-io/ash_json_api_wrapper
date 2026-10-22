@@ -1,0 +1,43 @@
+{
+  "query": {
+    "dimensions": ["Orders.id", "Orders.status", "Orders.customerName", "Orders.city", "Orders.amount", "Orders.createdAt"],
+    "filters": [{ "member": "Orders.status", "operator": "equals", "values": ["shipped"] }],
+    "order": [["Orders.createdAt", "desc"]],
+    "limit": 2,
+    "timezone": "UTC",
+    "timeDimensions": []
+  },
+  "data": [
+    {
+      "Orders.id": 2,
+      "Orders.status": "shipped",
+      "Orders.customerName": "Ada Example",
+      "Orders.city": "Springfield",
+      "Orders.amount": "120.50",
+      "Orders.createdAt": "2024-03-02T10:15:00.000"
+    },
+    {
+      "Orders.id": 1,
+      "Orders.status": "shipped",
+      "Orders.customerName": "Bo Sample",
+      "Orders.city": null,
+      "Orders.amount": "80",
+      "Orders.createdAt": "2024-03-01T08:00:00.000"
+    }
+  ],
+  "lastRefreshTime": "2024-03-03T00:00:00.000Z",
+  "annotation": {
+    "measures": {},
+    "dimensions": {
+      "Orders.id": { "title": "Orders Id", "shortTitle": "Id", "type": "number" },
+      "Orders.status": { "title": "Orders Status", "shortTitle": "Status", "type": "string" },
+      "Orders.customerName": { "title": "Orders Customer Name", "shortTitle": "Customer Name", "type": "string" },
+      "Orders.city": { "title": "Orders City", "shortTitle": "City", "type": "string" },
+      "Orders.amount": { "title": "Orders Amount", "shortTitle": "Amount", "type": "number" },
+      "Orders.createdAt": { "title": "Orders Created At", "shortTitle": "Created At", "type": "time" }
+    },
+    "segments": {},
+    "timeDimensions": {}
+  },
+  "total": 7
+}
