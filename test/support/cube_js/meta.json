@@ -1,0 +1,22 @@
+{
+  "cubes": [
+    {
+      "name": "Orders",
+      "title": "Orders",
+      "type": "cube",
+      "measures": [
+        { "name": "Orders.count", "title": "Orders Count", "type": "number", "aggType": "count" },
+        { "name": "Orders.totalAmount", "title": "Orders Total Amount", "type": "number", "aggType": "sum" }
+      ],
+      "dimensions": [
+        { "name": "Orders.id", "title": "Orders Id", "type": "number" },
+        { "name": "Orders.status", "title": "Orders Status", "type": "string" },
+        { "name": "Orders.customerName", "title": "Orders Customer Name", "type": "string" },
+        { "name": "Orders.city", "title": "Orders City", "type": "string" },
+        { "name": "Orders.amount", "title": "Orders Amount", "type": "number" },
+        { "name": "Orders.createdAt", "title": "Orders Created At", "type": "time" }
+      ],
+      "segments": []
+    }
+  ]
+}
