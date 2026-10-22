@@ -22,7 +22,7 @@ defmodule AshJsonApiWrapper.MixProject do
       deps: deps(),
       package: package(),
       elixirc_paths: elixirc_paths(Mix.env()),
-      dialyzer: [plt_add_apps: [:ash]],
+      dialyzer: [plt_add_apps: [:ash, :mix]],
       docs: docs(),
       description: @description,
       source_url: "https://github.com/ash-project/ash_json_api",
