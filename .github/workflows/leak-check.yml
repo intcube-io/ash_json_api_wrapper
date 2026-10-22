@@ -1,0 +1,64 @@
+# SPDX-FileCopyrightText: 2021 ash_json_api_wrapper contributors <https://github.com/ash-project/ash_json_api_wrapper/graphs/contributors>
+#
+# SPDX-License-Identifier: MIT
+
+# Checks pushes, pull requests, issues and comments against a denylist kept in
+# the LEAK_DENYLIST secret. See scripts/leak-check.sh. Logs only report where a
+# term was found, never the term or the line, because these logs are public.
+name: Leak check
+on:
+  push:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+  issues:
+    types: [opened, edited]
+  issue_comment:
+    types: [created, edited]
+
+permissions:
+  contents: read
+
+jobs:
+  leak-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check pushed commits
+        if: github.event_name == 'push'
+        env:
+          LEAK_DENYLIST: ${{ secrets.LEAK_DENYLIST }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [ "$BEFORE" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            BEFORE=$(git merge-base HEAD origin/main)
+          fi
+          scripts/leak-check.sh range "$BEFORE..$GITHUB_SHA"
+
+      - name: Check pull request
+        if: github.event_name == 'pull_request'
+        env:
+          LEAK_DENYLIST: ${{ secrets.LEAK_DENYLIST }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          TITLE: ${{ github.event.pull_request.title }}
+          BODY: ${{ github.event.pull_request.body }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          status=0
+          scripts/leak-check.sh range "$BASE..$HEAD" || status=1
+          printf '%s\n%s\n%s\n' "$TITLE" "$HEAD_REF" "$BODY" | scripts/leak-check.sh stdin "pull request title, branch or body" || status=1
+          exit $status
+
+      - name: Check issue or comment
+        if: github.event_name == 'issues' || github.event_name == 'issue_comment'
+        env:
+          LEAK_DENYLIST: ${{ secrets.LEAK_DENYLIST }}
+          TITLE: ${{ github.event.issue.title }}
+          BODY: ${{ github.event.issue.body }}
+          COMMENT: ${{ github.event.comment.body }}
+          NUMBER: ${{ github.event.issue.number }}
+        run: |
+          printf '%s\n%s\n%s\n' "$TITLE" "$BODY" "$COMMENT" | scripts/leak-check.sh stdin "issue #$NUMBER or its new comment"

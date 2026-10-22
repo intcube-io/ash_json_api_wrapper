@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2021 ash_json_api_wrapper contributors <https://github.com/ash-project/ash_json_api_wrapper/graphs/contributors>
+#
+# SPDX-License-Identifier: MIT
+
+# Re-checks everything about to be pushed, including commits made without the
+# other hooks installed.
+set -euo pipefail
+root=$(git rev-parse --show-toplevel)
+zero=0000000000000000000000000000000000000000
+
+while read -r _local_ref local_sha _remote_ref remote_sha; do
+  [ "$local_sha" = "$zero" ] && continue
+
+  if [ "$remote_sha" = "$zero" ]; then
+    base=$(git merge-base "$local_sha" upstream/main 2>/dev/null || git merge-base "$local_sha" origin/main)
+  else
+    base=$remote_sha
+  fi
+
+  "$root/scripts/leak-check.sh" range "$base..$local_sha"
+done
