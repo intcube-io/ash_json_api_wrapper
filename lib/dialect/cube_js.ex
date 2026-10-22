@@ -70,11 +70,10 @@ defmodule AshJsonApiWrapper.Dialect.CubeJs do
   }
 
   alias AshJsonApiWrapper.DataLayer.Info
-  alias AshJsonApiWrapper.Dialect.Naming
+  alias AshJsonApiWrapper.Dialect.{Expr, Naming}
   alias AshJsonApiWrapper.Request
 
-  @comparisons [Eq, NotEq, In, GreaterThan, GreaterThanOrEqual, LessThan, LessThanOrEqual, IsNil]
-  @functions [Contains, StringStartsWith, StringEndsWith]
+  require Expr
 
   @impl true
   def opts_schema do
@@ -115,26 +114,8 @@ defmodule AshJsonApiWrapper.Dialect.CubeJs do
   def can?(_, :sort), do: true
   def can?(_, {:sort, _}), do: true
   def can?(_, {:query_aggregate, :count}), do: true
-  def can?(_, {:filter_expr, %Not{}}), do: true
-
-  def can?(_, {:filter_expr, %In{left: %Ref{relationship_path: []}, right: right}}),
-    do: not is_struct(right, Ref)
-
-  def can?(_, {:filter_expr, %In{}}), do: false
-
-  def can?(_, {:filter_expr, %operator{left: left, right: right}})
-      when operator in @comparisons,
-      do: simple_comparison?(left, right)
-
-  def can?(_, {:filter_expr, %function{arguments: [%Ref{relationship_path: []}, value]}})
-      when function in @functions,
-      do: not is_struct(value, Ref)
-
+  def can?(_, {:filter_expr, expr}), do: Expr.supported?(expr)
   def can?(_, _), do: false
-
-  defp simple_comparison?(%Ref{relationship_path: []}, right), do: not is_struct(right, Ref)
-  defp simple_comparison?(left, %Ref{relationship_path: []}), do: not is_struct(left, Ref)
-  defp simple_comparison?(_, _), do: false
 
   @impl true
   def filter(query, filter, resource) do
@@ -183,17 +164,17 @@ defmodule AshJsonApiWrapper.Dialect.CubeJs do
   end
 
   defp translate(%operator{left: left, right: %Ref{}} = expression, negated?, resource)
-       when operator in @comparisons and not is_struct(left, Ref) do
-    translate(swap(expression), negated?, resource)
+       when operator in Expr.comparisons() and not is_struct(left, Ref) do
+    translate(Expr.attribute_left(expression), negated?, resource)
   end
 
   defp translate(%operator{left: %Ref{} = ref, right: value}, negated?, resource)
-       when operator in @comparisons do
+       when operator in Expr.comparisons() do
     {:ok, member_filter(ref, comparison(operator, negated?), [value], resource)}
   end
 
   defp translate(%function{arguments: [%Ref{} = ref, value]}, negated?, resource)
-       when function in @functions do
+       when function in Expr.functions() do
     {:ok, member_filter(ref, string_operator(function, negated?), [value], resource)}
   end
 
@@ -210,12 +191,6 @@ defmodule AshJsonApiWrapper.Dialect.CubeJs do
       :error -> [filter]
     end
   end
-
-  defp swap(%GreaterThan{} = op), do: %LessThan{left: op.right, right: op.left}
-  defp swap(%GreaterThanOrEqual{} = op), do: %LessThanOrEqual{left: op.right, right: op.left}
-  defp swap(%LessThan{} = op), do: %GreaterThan{left: op.right, right: op.left}
-  defp swap(%LessThanOrEqual{} = op), do: %GreaterThanOrEqual{left: op.right, right: op.left}
-  defp swap(op), do: %{op | left: op.right, right: op.left}
 
   defp comparison(Eq, false), do: "equals"
   defp comparison(Eq, true), do: "notEquals"

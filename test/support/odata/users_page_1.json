@@ -1,0 +1,21 @@
+{
+  "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#users(id,displayName,mail,accountEnabled,createdDateTime)",
+  "@odata.count": 3,
+  "@odata.nextLink": "https://graph.microsoft.com/v1.0/users?$select=id,displayName,mail,accountEnabled,createdDateTime&$count=true&$top=2&$skiptoken=RFNwdAIAAQAAABc6",
+  "value": [
+    {
+      "id": "6e7b768e-07e2-4810-8459-485f84f8f204",
+      "displayName": "Adele Example",
+      "mail": "adele@example.com",
+      "accountEnabled": true,
+      "createdDateTime": "2023-05-12T08:30:00Z"
+    },
+    {
+      "id": "87d349ed-44d7-43e1-9a83-5f2406dee5bd",
+      "displayName": "Alex Sample",
+      "mail": "alex@example.com",
+      "accountEnabled": true,
+      "createdDateTime": "2023-06-01T14:05:00Z"
+    }
+  ]
+}

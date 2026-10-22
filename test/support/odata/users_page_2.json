@@ -1,0 +1,13 @@
+{
+  "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#users(id,displayName,mail,accountEnabled,createdDateTime)",
+  "@odata.count": 3,
+  "value": [
+    {
+      "id": "5bde3e51-d13b-4db1-9948-fe4b109d11a7",
+      "displayName": "Avery Placeholder",
+      "mail": null,
+      "accountEnabled": false,
+      "createdDateTime": "2024-01-20T09:00:00Z"
+    }
+  ]
+}
