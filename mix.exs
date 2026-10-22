@@ -51,6 +51,9 @@ defmodule AshJsonApiWrapper.MixProject do
           "F A Q" ->
             "FAQ"
 
+          "Odata" ->
+            "OData"
+
           other ->
             other
         end
