@@ -85,7 +85,13 @@ defmodule AshJsonApiWrapper.QueryDialect do
   @doc "A `Spark.Options` schema for the dialect's options."
   @callback opts_schema() :: Keyword.t()
 
-  @optional_callbacks opts_schema: 0
+  @doc """
+  Whether a request body schema from an OpenAPI spec (with `$ref`s resolved) is a query in this
+  dialect. The resource generator turns `POST` operations with such a body into reads.
+  """
+  @callback query_body?(schema :: map) :: boolean
+
+  @optional_callbacks opts_schema: 0, query_body?: 1
 
   defmacro __using__(_) do
     quote do
