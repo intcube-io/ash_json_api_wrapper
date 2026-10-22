@@ -303,6 +303,7 @@ defmodule AshJsonApiWrapper.Dialect.Simple do
     endpoint = endpoint(query, resource)
 
     request = %Request{
+      method: endpoint.method || :get,
       path: endpoint.path,
       query: query.query_params || %{},
       body: query.body,

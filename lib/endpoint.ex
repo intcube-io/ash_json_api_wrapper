@@ -14,6 +14,7 @@ defmodule AshJsonApiWrapper.Endpoint do
     :runtime_sort?,
     :limit_with,
     :paginator,
+    :method,
     :__identifier__,
     __spark_metadata__: nil
   ]
@@ -31,6 +32,12 @@ defmodule AshJsonApiWrapper.Endpoint do
         type: :string,
         default: "/",
         doc: "The path of the endpoint relative to the base, or an absolute path"
+      ],
+      method: [
+        type: {:in, [:get, :post]},
+        default: :get,
+        doc:
+          "The HTTP method for reads with the simple dialect. A `:post` sends the body set with `AshJsonApiWrapper.set_body_param/3`."
       ],
       limit_with: [
         type: :any,
@@ -85,7 +92,8 @@ defmodule AshJsonApiWrapper.Endpoint do
       entity_path: AshJsonApiWrapper.DataLayer.Info.base_entity_path(resource),
       paginator: AshJsonApiWrapper.DataLayer.Info.base_paginator(resource),
       fields: AshJsonApiWrapper.DataLayer.Info.fields(resource),
-      fields_in: :body
+      fields_in: :body,
+      method: :get
     }
   end
 end
