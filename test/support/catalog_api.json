@@ -1,0 +1,79 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Catalog API",
+    "description": "A made-up API whose spec carries x-ash-* hints for the resource generator.",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/items": {
+      "get": {
+        "operationId": "listItems",
+        "responses": {
+          "200": {
+            "description": "Items",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "type": "array", "items": { "$ref": "#/components/schemas/Item" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/categories": {
+      "get": {
+        "operationId": "listCategories",
+        "responses": {
+          "200": {
+            "description": "Categories",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Category" } }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Item": {
+        "type": "object",
+        "x-ash-primary-key": "sku",
+        "properties": {
+          "sku": { "type": "string" },
+          "title": { "type": "string", "x-ash-name": "name" },
+          "status": { "type": "string", "x-ash-filter-operators": ["==", "in"] },
+          "categoryId": {
+            "type": "integer",
+            "x-ash-relationship": { "name": "category", "destination": "Catalog.Category" }
+          },
+          "internalNote": { "type": "string", "x-ash-skip": true }
+        }
+      },
+      "Category": {
+        "type": "object",
+        "x-ash-primary-key": "id",
+        "x-ash-relationships": [
+          {
+            "name": "items",
+            "type": "has_many",
+            "destination": "Catalog.Item",
+            "destination_attribute": "category_id"
+          }
+        ],
+        "properties": {
+          "id": { "type": "integer" },
+          "name": { "type": "string" }
+        }
+      }
+    }
+  }
+}
