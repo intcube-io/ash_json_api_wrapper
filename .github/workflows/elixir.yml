@@ -7,12 +7,18 @@ on:
   push:
     tags:
       - "v*"
-    branches: [main]
+    branches: [main, next]
   pull_request:
-    branches: [main]
+    branches: [main, next]
   workflow_call:
 jobs:
   ash-ci:
+    # The org default token is read-only; ash-ci jobs request these.
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+      security-events: write
     uses: ash-project/ash/.github/workflows/ash-ci.yml@main
     with:
       reuse: true
