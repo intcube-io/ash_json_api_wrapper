@@ -261,10 +261,7 @@ defmodule AshJsonApiWrapper.Dialect.Simple do
   end
 
   defp update_in!(body, [key], default, func) do
-    body
-    |> Kernel.||(%{})
-    |> Map.put_new(key, default)
-    |> Map.update!(key, func)
+    Map.update(body || %{}, key, default, func)
   end
 
   defp update_in!(body, [first | rest], default, func) do
