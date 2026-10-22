@@ -10,31 +10,22 @@ defmodule AshJsonApiWrapper.Filter do
   end
 
   def find_simple_filter(
-        %Ash.Query.BooleanExpression{op: :and, left: left, right: right} = expr,
+        %Ash.Query.BooleanExpression{op: :and, left: left, right: right},
         field
       ) do
-    case find_simple_filter(left, field) do
-      {:ok, nil} ->
-        case find_simple_filter(right, field) do
-          {:ok, nil} ->
-            {:ok, expr, []}
+    case {find_simple_filter(left, field), find_simple_filter(right, field)} do
+      {{:ok, nil}, {:ok, nil}} ->
+        {:ok, nil}
 
-          {:ok, {right_remaining, right_instructions}} ->
-            {:ok, Ash.Query.BooleanExpression.new(:and, left, right_remaining),
-             right_instructions}
-        end
+      {{:ok, nil}, {:ok, {right_remaining, right_instructions}}} ->
+        {:ok, {and_expr(left, right_remaining), right_instructions}}
 
-      {:ok, {left_remaining, left_instructions}} ->
-        case find_simple_filter(right, field) do
-          {:ok, nil} ->
-            {:ok,
-             {Ash.Query.BooleanExpression.new(:and, left_remaining, right), left_instructions}}
+      {{:ok, {left_remaining, left_instructions}}, {:ok, nil}} ->
+        {:ok, {and_expr(left_remaining, right), left_instructions}}
 
-          {:ok, {right_remaining, right_instructions}} ->
-            {:ok,
-             {Ash.Query.BooleanExpression.new(:and, left_remaining, right_remaining),
-              left_instructions ++ right_instructions}}
-        end
+      {{:ok, {left_remaining, left_instructions}}, {:ok, {right_remaining, right_instructions}}} ->
+        {:ok,
+         {and_expr(left_remaining, right_remaining), left_instructions ++ right_instructions}}
     end
   end
 
@@ -94,35 +85,33 @@ defmodule AshJsonApiWrapper.Filter do
   end
 
   def find_place_in_list_filter(
-        %Ash.Query.BooleanExpression{op: op, left: left, right: right} = expr,
+        %Ash.Query.BooleanExpression{op: op, left: left, right: right},
         field,
         path,
         type,
         context
       ) do
-    case find_place_in_list_filter(left, field, path, type, context) do
-      {:ok, nil} ->
-        case find_place_in_list_filter(right, field, path, type, context) do
-          {:ok, nil} ->
-            {:ok, expr, []}
+    case {find_place_in_list_filter(left, field, path, type, context),
+          find_place_in_list_filter(right, field, path, type, context)} do
+      {{:ok, nil}, {:ok, nil}} ->
+        {:ok, nil}
 
-          {:ok, {right_remaining, right_instructions}} ->
-            {:ok, Ash.Query.BooleanExpression.new(op, left, right_remaining), right_instructions}
-        end
+      # Both sides of an `or` must end up in the list, otherwise it is left to the runtime filter.
+      {{:ok, {nil, left_instructions}}, {:ok, {nil, right_instructions}}} when op == :or ->
+        {:ok, {nil, left_instructions ++ right_instructions}}
 
-      {:ok, {left_remaining, left_instructions}} ->
-        case find_place_in_list_filter(right, field, path, %{
-               context
-               | other_branch_instructions: left_instructions
-             }) do
-          {:ok, nil} ->
-            {:ok, {Ash.Query.BooleanExpression.new(op, left_remaining, right), left_instructions}}
+      _ when op == :or ->
+        {:ok, nil}
 
-          {:ok, {right_remaining, right_instructions}} ->
-            {:ok,
-             {Ash.Query.BooleanExpression.new(op, left_remaining, right_remaining),
-              left_instructions ++ right_instructions}}
-        end
+      {{:ok, nil}, {:ok, {right_remaining, right_instructions}}} ->
+        {:ok, {and_expr(left, right_remaining), right_instructions}}
+
+      {{:ok, {left_remaining, left_instructions}}, {:ok, nil}} ->
+        {:ok, {and_expr(left_remaining, right), left_instructions}}
+
+      {{:ok, {left_remaining, left_instructions}}, {:ok, {right_remaining, right_instructions}}} ->
+        {:ok,
+         {and_expr(left_remaining, right_remaining), left_instructions ++ right_instructions}}
     end
   end
 
@@ -233,67 +222,42 @@ defmodule AshJsonApiWrapper.Filter do
         in_an_or?,
         uses_endpoint
       ) do
-    case find_filter_that_uses_get_endpoint(left, resource, action, templates, in_an_or?) do
-      {:ok, {left_remaining, get_endpoint, left_templates}} ->
-        if uses_endpoint && get_endpoint != uses_endpoint do
+    with {:ok, left_result} <-
+           find_filter_that_uses_get_endpoint(left, resource, action, nil, in_an_or?),
+         {:ok, right_result} <-
+           find_filter_that_uses_get_endpoint(right, resource, action, nil, in_an_or?) do
+      {left_remaining, left_endpoint, left_templates} = left_result || {left, nil, nil}
+      {right_remaining, right_endpoint, right_templates} = right_result || {right, nil, nil}
+
+      case Enum.uniq(Enum.reject([uses_endpoint, left_endpoint, right_endpoint], &is_nil/1)) do
+        [] ->
+          {:ok, nil}
+
+        [endpoint] ->
+          {:ok,
+           {and_expr(left_remaining, right_remaining), endpoint,
+            add_templates([left_templates, right_templates, templates])}}
+
+        [first, second | _] ->
           {:error,
-           "Filter would cause the usage of different endpoints: #{inspect(uses_endpoint)} and #{inspect(get_endpoint)}"}
-        else
-          case find_filter_that_uses_get_endpoint(right, resource, action, templates, in_an_or?) do
-            {:ok, {right_remaining, get_endpoint, right_templates}} ->
-              if uses_endpoint && get_endpoint != uses_endpoint do
-                {:error,
-                 "Filter would cause the usage of different endpoints: #{inspect(uses_endpoint)} and #{inspect(get_endpoint)}"}
-              else
-                {:ok,
-                 {Ash.Query.BooleanExpression.new(:and, left_remaining, right_remaining),
-                  uses_endpoint, add_templates([left_templates, right_templates, templates])}}
-              end
-
-            {:ok, nil} ->
-              {:ok,
-               {Ash.Query.BooleanExpression.new(:and, left_remaining, right), uses_endpoint,
-                add_templates([left_templates, templates])}}
-
-            {:error, error} ->
-              {:error, error}
-          end
-        end
-
-      {:ok, nil} ->
-        case find_filter_that_uses_get_endpoint(right, resource, action, templates, in_an_or?) do
-          {:ok, {right_remaining, get_endpoint, right_templates}} ->
-            if uses_endpoint && get_endpoint != uses_endpoint do
-              {:error,
-               "Filter would cause the usage of different endpoints: #{inspect(uses_endpoint)} and #{inspect(get_endpoint)}"}
-            else
-              {:ok,
-               {Ash.Query.BooleanExpression.new(:and, left, right_remaining), uses_endpoint,
-                add_templates([right_templates, templates])}}
-            end
-
-          {:ok, nil} ->
-            {:ok, {Ash.Query.BooleanExpression.new(:and, left, right), uses_endpoint, nil}}
-        end
-
-      {:error, error} ->
-        {:error, error}
+           "Filter would cause the usage of different endpoints: #{inspect(first)} and #{inspect(second)}"}
+      end
     end
   end
 
   def find_filter_that_uses_get_endpoint(
-        %Ash.Query.BooleanExpression{op: :or, left: left, right: right} = expr,
+        %Ash.Query.BooleanExpression{op: :or, left: left, right: right},
         resource,
         action,
         templates,
         _in_an_or?,
-        uses_endpoint
+        _uses_endpoint
       ) do
     case find_filter_that_uses_get_endpoint(left, resource, action, templates, true) do
       {:ok, nil} ->
         case find_filter_that_uses_get_endpoint(right, resource, action, templates, true) do
           {:ok, nil} ->
-            {:ok, {expr, uses_endpoint, nil}}
+            {:ok, nil}
 
           {:error, error} ->
             {:error, error}
@@ -308,14 +272,14 @@ defmodule AshJsonApiWrapper.Filter do
   end
 
   def find_filter_that_uses_get_endpoint(
-        %Ash.Query.Operator.Eq{left: %Ash.Query.Ref{}, right: %Ash.Query.Ref{}} = expr,
+        %Ash.Query.Operator.Eq{left: %Ash.Query.Ref{}, right: %Ash.Query.Ref{}},
         _,
         _,
         _,
         _,
-        uses_endpoint
+        _uses_endpoint
       ) do
-    {:ok, {expr, uses_endpoint, nil}}
+    {:ok, nil}
   end
 
   def find_filter_that_uses_get_endpoint(
@@ -419,6 +383,11 @@ defmodule AshJsonApiWrapper.Filter do
         end
     end
   end
+
+  # `nil` stands for a part of the filter that is fully handled by the request.
+  defp and_expr(nil, right), do: right
+  defp and_expr(left, nil), do: left
+  defp and_expr(left, right), do: Ash.Query.BooleanExpression.new(:and, left, right)
 
   defp add_templates(templates) do
     if Enum.all?(templates, &is_nil/1) do
