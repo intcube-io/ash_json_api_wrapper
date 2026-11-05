@@ -1,0 +1,77 @@
+{
+  "openapi": "3.0.3",
+  "info": {"title": "Made-up inventory query API", "version": "1.0.0"},
+  "paths": {
+    "/api/products": {
+      "post": {
+        "operationId": "queryProducts",
+        "requestBody": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/ProductsRequest"}}}},
+        "responses": {"200": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/ProductsResponse"}}}}}
+      }
+    },
+    "/api/products/archive": {
+      "post": {
+        "operationId": "archiveProducts",
+        "requestBody": {"content": {"application/json": {"schema": {"type": "object", "properties": {"productIds": {"type": "array", "items": {"type": "string"}}}}}}},
+        "responses": {"200": {"content": {"application/json": {"schema": {"type": "object"}}}}}
+      }
+    },
+    "/api/warehouses": {
+      "post": {
+        "operationId": "queryWarehouses",
+        "requestBody": {"content": {"application/json": {"schema": {"type": "object", "properties": {"query": {"type": "object", "properties": {"dimensions": {"type": "array", "items": {"type": "string", "enum": ["warehouseId", "city"]}}}}}}}}},
+        "responses": {"200": {"content": {"application/json": {"schema": {"type": "object", "properties": {"data": {"type": "array", "items": {"$ref": "#/components/schemas/Warehouse"}}}}}}}}
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ProductsRequest": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "object",
+            "properties": {
+              "dimensions": {"type": "array", "items": {"type": "string", "enum": ["productId", "name", "category", "price", "tags", "warehouseId", "releasedOn"]}},
+              "filters": {"type": "array", "items": {"type": "object"}},
+              "timeDimensions": {"type": "array", "items": {"type": "object", "properties": {"dimension": {"type": "string", "enum": ["updatedAt"]}}}},
+              "order": {"type": "object"},
+              "limit": {"type": "integer"},
+              "offset": {"type": "integer"}
+            }
+          }
+        }
+      },
+      "ProductsResponse": {
+        "type": "object",
+        "properties": {
+          "data": {"type": "array", "items": {"$ref": "#/components/schemas/Product"}},
+          "total": {"type": "integer", "nullable": true}
+        }
+      },
+      "Product": {
+        "type": "object",
+        "properties": {
+          "product_id": {"type": "string", "format": "uuid"},
+          "name": {"type": "string", "maxLength": 200},
+          "category": {"type": "string", "enum": ["tools", "garden", "kitchen"]},
+          "price": {"type": "number", "format": "float"},
+          "stock_level": {"type": "integer", "nullable": true},
+          "tags": {"type": "array", "items": {"type": "string"}},
+          "warehouse_id": {"type": "string", "format": "uuid", "x-ash-relationship": {"type": "belongs_to", "name": "warehouse", "destination": "Inventory.Warehouse"}},
+          "released_on": {"type": "string", "format": "date"},
+          "updated_at": {"type": "string", "format": "date-time"},
+          "internal_note": {"type": "string", "x-ash-skip": true}
+        }
+      },
+      "Warehouse": {
+        "type": "object",
+        "x-ash-primary-key": "warehouseId",
+        "properties": {
+          "warehouseId": {"type": "string", "format": "uuid"},
+          "city": {"type": "string", "x-ash-filter-operators": ["eq", "in"]}
+        }
+      }
+    }
+  }
+}
