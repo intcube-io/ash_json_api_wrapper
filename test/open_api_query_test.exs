@@ -127,6 +127,22 @@ defmodule AshJsonApiWrapper.OpenApi.QueryTest do
     end
   end
 
+  test "fragments and a dialect per resource" do
+    code =
+      code(
+        config(
+          fragments: [Inventory.ProductActions],
+          endpoint_actions: [query_products: [:by_warehouse]],
+          dialect: {AshJsonApiWrapper.Dialect.CubeJs, response_case: :snake, total: false}
+        ),
+        :"Inventory.Product"
+      )
+
+    assert code =~ "fragments: [Inventory.ProductActions]"
+    assert code =~ "endpoint [:query_products, :by_warehouse] do"
+    assert code =~ "total: false"
+  end
+
   test "regenerating gives the same code" do
     assert code(config(rename: [name: :title]), :"Inventory.Product") ==
              code(config(rename: [name: :title]), :"Inventory.Product")

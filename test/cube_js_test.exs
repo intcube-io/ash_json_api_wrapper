@@ -29,7 +29,7 @@ defmodule AshJsonApiWrapper.CubeJsTest do
       endpoints do
         base("https://cube.example.com/cubejs-api/v1")
 
-        endpoint :read do
+        endpoint [:read, :for_region] do
           path("/load")
         end
       end
@@ -63,6 +63,23 @@ defmodule AshJsonApiWrapper.CubeJsTest do
       read :read do
         primary?(true)
         pagination(offset?: true, countable: true, required?: false)
+      end
+
+      read :for_region do
+        argument(:region_id, :string, allow_nil?: false)
+
+        prepare(fn query, _ ->
+          AshJsonApiWrapper.Dialect.CubeJs.merge_query(query, %{
+            "segment" => "online",
+            "filters" => [
+              %{
+                "member" => "orders.regionId",
+                "operator" => "equals",
+                "values" => [query.arguments.region_id]
+              }
+            ]
+          })
+        end)
       end
     end
 
@@ -254,5 +271,22 @@ defmodule AshJsonApiWrapper.CubeJsTest do
 
     assert page.count == 3
     assert length(page.results) == 2
+  end
+
+  test "a preparation adds raw parts to the query" do
+    expect_requests(2)
+
+    Order
+    |> Ash.Query.for_read(:for_region, %{region_id: "north"})
+    |> Ash.Query.filter(status == "shipped")
+    |> Ash.read!()
+
+    query = query_sent()
+    assert query["segment"] == "online"
+
+    assert query["filters"] == [
+             %{"member" => "orders.status", "operator" => "equals", "values" => ["shipped"]},
+             %{"member" => "orders.regionId", "operator" => "equals", "values" => ["north"]}
+           ]
   end
 end

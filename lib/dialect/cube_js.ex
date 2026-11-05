@@ -406,9 +406,44 @@ defmodule AshJsonApiWrapper.Dialect.CubeJs do
         ]
         |> Enum.reject(fn {_key, value} -> value in [nil, []] end)
         |> Map.new()
+        |> merge_parts(get_in(query.context || %{}, [:data_layer, :cube_query]) || %{})
 
       {:ok, body}
     end
+  end
+
+  @doc """
+  Adds raw parts to the Cube query of a read: keys the API takes outside of
+  `filters` (an id that scopes the whole query, say), or filters on members that
+  are no attribute of the resource. `"filters"` are appended to the translated
+  filters; every other key is set as given.
+
+  Meant for preparations of read actions that take such values as arguments:
+
+      read :for_group do
+        argument :group_id, :uuid, allow_nil?: false
+
+        prepare fn query, _ ->
+          AshJsonApiWrapper.Dialect.CubeJs.merge_query(query, %{
+            "filters" => [
+              %{"member" => "groupId", "operator" => "equals", "values" => [query.arguments.group_id]}
+            ]
+          })
+        end
+      end
+  """
+  @spec merge_query(Ash.Query.t(), map) :: Ash.Query.t()
+  def merge_query(%Ash.Query{} = query, parts) do
+    existing = get_in(query.context, [:data_layer, :cube_query]) || %{}
+    merged = merge_parts(existing, Map.new(parts, fn {key, value} -> {to_string(key), value} end))
+    Ash.Query.set_context(query, %{data_layer: %{cube_query: merged}})
+  end
+
+  defp merge_parts(query, parts) do
+    Map.merge(query, parts, fn
+      "filters", left, right -> left ++ right
+      _key, _left, right -> right
+    end)
   end
 
   defp dimensions(query, resource, opts) do
