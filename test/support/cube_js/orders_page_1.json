@@ -1,0 +1,9 @@
+{
+  "query": {"dimensions": ["orders.id", "orders.status"], "limit": 2, "offset": 0},
+  "data": [
+    {"id": 1, "status": "completed", "amount": 120.5, "customer_name": "Ada Example", "created_at": "2024-03-01T10:00:00.000Z"},
+    {"id": 2, "status": "processing", "amount": 80, "customer_name": "Bo Sample", "created_at": "2024-03-02T11:30:00.000Z"}
+  ],
+  "lastRefreshTime": "2024-03-05T00:00:00.000Z",
+  "total": 3
+}
