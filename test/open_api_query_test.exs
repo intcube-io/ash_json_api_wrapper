@@ -160,12 +160,8 @@ defmodule AshJsonApiWrapper.OpenApi.QueryTest do
 
     refute code(config, :"Inventory.Product") =~ ~s(path "$.product_id")
 
-    assert code(
-             Keyword.delete(config, :dialect)
-             |> Keyword.put(:dialect, AshJsonApiWrapper.Dialect.CubeJs)
-             |> put_in([:resources, :"Inventory.Product", :response_keys], :spec),
-             :"Inventory.Product"
-           ) =~ ~s(path "$.product_id")
+    spec_keys = put_in(config, [:resources, :"Inventory.Product", :response_keys], :spec)
+    assert code(spec_keys, :"Inventory.Product") =~ ~s(path "$.product_id")
   end
 
   test "regenerating gives the same code" do
