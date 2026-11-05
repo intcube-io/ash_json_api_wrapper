@@ -573,6 +573,9 @@ defmodule AshJsonApiWrapper.Dialect.CubeJs do
     end
   end
 
+  @doc false
+  def convert_name(name, style), do: convert(name, style)
+
   defp convert(name, :as_is), do: to_string(name)
   defp convert(name, :snake), do: name |> to_string() |> Macro.underscore()
 
