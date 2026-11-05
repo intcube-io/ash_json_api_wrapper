@@ -176,17 +176,22 @@ defmodule AshJsonApiWrapper.OpenApi.SearchTest do
         |> Igniter.compose_task("ash_json_api_wrapper.gen.resources", [config_path])
         |> assert_creates("lib/my_app/inventory/product.ex")
 
-      igniter
-      |> Igniter.Test.apply_igniter!()
-      |> then(fn igniter ->
-        write_config.([])
-        Igniter.compose_task(igniter, "ash_json_api_wrapper.gen.resources", [config_path])
-      end)
+      igniter =
+        igniter
+        |> Igniter.Test.apply_igniter!()
+        |> then(fn igniter ->
+          write_config.([])
+          Igniter.compose_task(igniter, "ash_json_api_wrapper.gen.resources", [config_path])
+        end)
+
+      content =
+        igniter.rewrite
+        |> Rewrite.source!("lib/my_app/inventory/product.ex")
+        |> Rewrite.Source.get(:content)
+
       # The test project's formatter does not import the Ash DSL, so it adds parens.
-      |> assert_has_patch("lib/my_app/inventory/product.ex", """
-      - |    read(:search_products)
-      + |    create(:search_products)
-      """)
+      assert content =~ "create(:search_products)"
+      refute content =~ "read(:search_products)"
     end
   end
 end

@@ -181,7 +181,30 @@ defmodule AshJsonApiWrapper.DataLayer do
 
   @impl true
   def can?(_, :create), do: true
+
+  def can?(resource, {:filter_expr, expr} = feature) do
+    operator_allowed?(resource, expr) && Info.dialect_module(resource).can?(resource, feature)
+  end
+
   def can?(resource, feature), do: Info.dialect_module(resource).can?(resource, feature)
+
+  defp operator_allowed?(resource, expr) do
+    with %Ash.Query.Ref{relationship_path: [], attribute: %{name: name}} <- filtered_ref(expr),
+         %{filter_operators: operators} when is_list(operators) <- Info.field(resource, name) do
+      operator_name(expr) in operators
+    else
+      _ -> true
+    end
+  end
+
+  defp filtered_ref(%{left: %Ash.Query.Ref{} = ref}), do: ref
+  defp filtered_ref(%{right: %Ash.Query.Ref{} = ref}), do: ref
+  defp filtered_ref(%{arguments: [%Ash.Query.Ref{} = ref | _]}), do: ref
+  defp filtered_ref(_), do: nil
+
+  defp operator_name(%{__operator__?: true, operator: operator}), do: operator
+  defp operator_name(%{__function__?: true, name: name}), do: name
+  defp operator_name(_), do: nil
 
   @impl true
   def resource_to_query(resource, domain \\ nil) do
