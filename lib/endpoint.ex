@@ -6,6 +6,7 @@ defmodule AshJsonApiWrapper.Endpoint do
   defstruct [
     :action,
     :path,
+    :method,
     :entity_path,
     :fields,
     :fields_in,
@@ -31,6 +32,11 @@ defmodule AshJsonApiWrapper.Endpoint do
         type: :string,
         default: "/",
         doc: "The path of the endpoint relative to the base, or an absolute path"
+      ],
+      method: [
+        type: {:in, [:get, :post, :put, :patch, :delete]},
+        doc:
+          "The HTTP method. Defaults to `:get`, or to what the dialect uses for reads (`:post` for `AshJsonApiWrapper.Dialect.CubeJs`)."
       ],
       limit_with: [
         type: :any,

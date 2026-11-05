@@ -23,6 +23,20 @@ defmodule AshJsonApiWrapper.DataLayer.Info do
     )
   end
 
+  @spec dialect(map | Ash.Resource.t()) :: AshJsonApiWrapper.QueryDialect.ref()
+  def dialect(resource) do
+    case Extension.get_opt(
+           resource,
+           [:json_api_wrapper],
+           :dialect,
+           AshJsonApiWrapper.Dialect.Simple,
+           false
+         ) do
+      {module, opts} -> {module, opts}
+      module when is_atom(module) -> {module, []}
+    end
+  end
+
   @spec base_entity_path(map | Ash.Resource.t()) :: String.t() | nil
   def base_entity_path(resource) do
     Extension.get_opt(resource, [:json_api_wrapper], :base_entity_path, nil, false)
