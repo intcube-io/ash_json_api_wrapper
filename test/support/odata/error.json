@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "Request_UnsupportedQuery",
+    "message": "Unsupported or invalid query filter clause specified for property 'displayName' of resource 'User'.",
+    "innerError": { "date": "2024-04-08T07:20:00", "request-id": "00000000-0000-0000-0000-000000000000" }
+  }
+}

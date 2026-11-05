@@ -1,0 +1,25 @@
+{
+  "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#groups",
+  "value": [
+    {
+      "id": "02bd9fd6-8f93-4758-87c3-1fb73740a315",
+      "displayName": "Engineering",
+      "description": "Everyone in engineering",
+      "mail": "engineering@example.com",
+      "mailEnabled": true,
+      "securityEnabled": false,
+      "groupTypes": ["Unified"],
+      "createdDateTime": "2022-11-03T10:00:00Z"
+    },
+    {
+      "id": "8090c93e-ba7c-433e-9f39-08c7ba07c0b3",
+      "displayName": "Building access",
+      "description": null,
+      "mail": null,
+      "mailEnabled": false,
+      "securityEnabled": true,
+      "groupTypes": [],
+      "createdDateTime": "2021-02-17T16:45:00Z"
+    }
+  ]
+}
