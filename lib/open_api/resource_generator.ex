@@ -195,6 +195,7 @@ defmodule AshJsonApiWrapper.OpenApi.ResourceGenerator do
       read: 1,
       read: 2,
       create: 1,
+      description: 1,
       create: 2,
       attribute: 2,
       attribute: 3,
@@ -323,31 +324,50 @@ defmodule AshJsonApiWrapper.OpenApi.ResourceGenerator do
     {code, _} =
       Enum.map_reduce(operations, false, fn
         {_path, _method, operation, :read}, primary_set? ->
-          options =
-            [
-              if(!primary_set?, do: "primary? true"),
-              if(countable?, do: "pagination offset?: true, countable: true, required?: false")
-            ]
-            |> Enum.reject(&is_nil/1)
+          options = [
+            description_option(operation),
+            if(!primary_set?, do: "primary? true"),
+            if(countable?, do: "pagination offset?: true, countable: true, required?: false")
+          ]
 
-          code =
-            if options == [] do
-              "read :#{operation_id(operation)}"
-            else
-              """
-              read :#{operation_id(operation)} do
-                #{Enum.join(options, "\n")}
-              end
-              """
-            end
-
-          {code, true}
+          {action_code("read", operation, options), true}
 
         {_path, _method, operation, :create}, primary_set? ->
-          {"create :#{operation_id(operation)}", primary_set?}
+          {action_code("create", operation, [description_option(operation)]), primary_set?}
       end)
 
     Enum.join(code, "\n\n")
+  end
+
+  defp action_code(type, operation, options) do
+    case Enum.reject(options, &is_nil/1) do
+      [] ->
+        "#{type} :#{operation_id(operation)}"
+
+      options ->
+        """
+        #{type} :#{operation_id(operation)} do
+          #{Enum.join(options, "\n")}
+        end
+        """
+    end
+  end
+
+  # The operation's summary, or the first line of its description.
+  defp description_option(operation) do
+    text =
+      case operation do
+        %{"summary" => summary} when is_binary(summary) and summary != "" ->
+          summary
+
+        %{"description" => description} when is_binary(description) ->
+          description |> String.split("\n", trim: true) |> List.first()
+
+        _ ->
+          nil
+      end
+
+    if text, do: "description #{inspect(String.trim(text))}"
   end
 
   # ── entity schema ──

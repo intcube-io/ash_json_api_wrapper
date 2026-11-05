@@ -53,6 +53,7 @@ defmodule AshJsonApiWrapper.OpenApi.QueryTest do
     code = code(config(), :"Inventory.Product")
 
     assert code =~ "read :query_products do"
+    assert code =~ ~s(description "Query products")
     assert code =~ "primary? true"
     assert code =~ "pagination offset?: true, countable: true, required?: false"
     refute code =~ "archive_products"
