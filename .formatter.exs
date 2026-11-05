@@ -17,6 +17,7 @@ spark_locals_without_parens = [
   get_endpoint: 2,
   get_endpoint: 3,
   limit_with: 1,
+  method: 1,
   paginator: 1,
   path: 1,
   runtime_sort?: 1,

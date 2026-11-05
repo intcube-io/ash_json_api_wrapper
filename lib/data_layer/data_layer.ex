@@ -227,6 +227,7 @@ defmodule AshJsonApiWrapper.DataLayer do
      %{
        query
        | query_params: params,
+         body: context[:data_layer][:body],
          headers: headers,
          domain: query.domain,
          action: action,

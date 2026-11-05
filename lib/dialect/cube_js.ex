@@ -107,6 +107,13 @@ defmodule AshJsonApiWrapper.Dialect.CubeJs do
   end
 
   @impl true
+  def query_body?(%{"properties" => %{"query" => %{"properties" => properties}}}) do
+    Enum.any?(["dimensions", "measures", "filters"], &Map.has_key?(properties, &1))
+  end
+
+  def query_body?(_), do: false
+
+  @impl true
   def can?(_, feature)
       when feature in [:filter, :boolean_filter, :nested_expressions, :limit, :offset, :select],
       do: true
