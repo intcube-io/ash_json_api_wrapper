@@ -5,6 +5,7 @@
     "/api/products": {
       "post": {
         "operationId": "queryProducts",
+        "summary": "Query products",
         "requestBody": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/ProductsRequest"}}}},
         "responses": {"200": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/ProductsResponse"}}}}}
       }
