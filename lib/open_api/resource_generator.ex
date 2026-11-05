@@ -44,6 +44,12 @@ defmodule AshJsonApiWrapper.OpenApi.ResourceGenerator do
   Per resource:
 
   * `:path` - operations whose path starts with this belong to the resource
+  * `:dialect` - a dialect (with options) for this resource only
+  * `:endpoint_actions` - `[generated_action: [:other_action]]`: hand-written actions
+    (in a fragment) that use the endpoint of a generated one
+  * `:fragments` - `Spark.Dsl.Fragment`s of `Ash.Resource` added to the generated
+    module. Hand-written actions, preparations and policies go there, so they
+    survive regeneration.
   * `:operations` - narrows them to these operation ids
   * `:reads` - POST operations that are reads. Without it, a POST is a read when its
     request body is a query in the dialect's shape (`c:AshJsonApiWrapper.QueryDialect.query_request?/3`),
@@ -103,6 +109,7 @@ defmodule AshJsonApiWrapper.OpenApi.ResourceGenerator do
   end
 
   defp generate_resource(spec, domain, main_config, resource, config) do
+    main_config = Keyword.merge(main_config, Keyword.take(config, [:dialect]))
     {dialect, dialect_opts} = dialect(main_config)
     operations = operations(spec, config)
 
@@ -138,7 +145,7 @@ defmodule AshJsonApiWrapper.OpenApi.ResourceGenerator do
 
     code = """
     defmodule #{module_name(resource)} do
-      use Ash.Resource, domain: #{inspect(domain)}, data_layer: AshJsonApiWrapper.DataLayer
+      use Ash.Resource, domain: #{inspect(domain)}, data_layer: AshJsonApiWrapper.DataLayer#{fragments(config)}
 
       json_api_wrapper do
         #{if main_config[:tesla], do: "tesla #{inspect(main_config[:tesla])}"}
@@ -146,7 +153,7 @@ defmodule AshJsonApiWrapper.OpenApi.ResourceGenerator do
 
         endpoints do
           #{if main_config[:endpoint], do: "base #{inspect(main_config[:endpoint])}"}
-          #{endpoints(operations, entity_path)}
+          #{endpoints(operations, entity_path, config)}
         end
 
         #{fields_block(attributes, extra_fields(config, attributes))}
@@ -205,6 +212,14 @@ defmodule AshJsonApiWrapper.OpenApi.ResourceGenerator do
       destination_attribute: 1,
       define_attribute?: 1
     ]
+  end
+
+  defp fragments(config) do
+    case config[:fragments] do
+      nil -> ""
+      [] -> ""
+      fragments -> ", fragments: #{inspect(fragments)}"
+    end
   end
 
   defp module_name(resource) when is_atom(resource),
@@ -280,10 +295,18 @@ defmodule AshJsonApiWrapper.OpenApi.ResourceGenerator do
     raise ArgumentError, "operation without operationId: #{inspect(operation)}"
   end
 
-  defp endpoints(operations, entity_path) do
+  defp endpoints(operations, entity_path, config) do
     Enum.map_join(operations, "\n\n", fn {path, method, operation, type} ->
+      action = String.to_atom(operation_id(operation))
+
+      actions =
+        case Keyword.get(config[:endpoint_actions] || [], action, []) do
+          [] -> inspect(action)
+          more -> inspect([action | more])
+        end
+
       """
-      endpoint :#{operation_id(operation)} do
+      endpoint #{actions} do
         path #{inspect(path)}
         #{if method != "get", do: "method :#{method}"}
         #{if entity_path && type == :read, do: "entity_path #{inspect(entity_path)}"}
