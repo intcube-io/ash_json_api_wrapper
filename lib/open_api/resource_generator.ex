@@ -74,6 +74,8 @@ defmodule AshJsonApiWrapper.OpenApi.ResourceGenerator do
     `filter_operators []`, so Ash rejects filters the API would not accept
   * `:relationships` - `[belongs_to: [name: opts], has_many: [...]]`, written
     into a `relationships` block as given
+  * `:types` - `[field: ash_type]` where the spec's type is too loose (a date sent
+    as a plain string)
   * `:fields` - any `field` options of the data layer per attribute
     (`filter_handler`, `member`, `time_dimension?`, `filter_operators`, `path`)
 
@@ -493,6 +495,7 @@ defmodule AshJsonApiWrapper.OpenApi.ResourceGenerator do
       spec_name: name,
       name: attribute_name,
       property: property,
+      type: type_override(context.config, name, attribute_name),
       primary_key?: name in context.primary_key or attribute_name in context.primary_key,
       field:
         path_option(name, attribute_name, field_options, context) ++
@@ -607,6 +610,7 @@ defmodule AshJsonApiWrapper.OpenApi.ResourceGenerator do
         {:primary_key, List.wrap(config[:primary_key])},
         {:rename, Keyword.keys(config[:rename] || [])},
         {:filterable, Keyword.keys(config[:filterable] || [])},
+        {:types, Keyword.keys(config[:types] || [])},
         {:fields, Keyword.keys(config[:fields] || []) -- Enum.map(path_params, &String.to_atom/1)}
       ]
 
@@ -619,8 +623,18 @@ defmodule AshJsonApiWrapper.OpenApi.ResourceGenerator do
     :ok
   end
 
-  defp attribute_code(%{name: name, property: property, primary_key?: primary_key?}) do
-    {type, constraints} = type(property, name)
+  defp type_override(config, name, attribute_name) do
+    Enum.find_value(config[:types] || [], fn {key, type} ->
+      if to_string(key) in [name, attribute_name], do: type
+    end)
+  end
+
+  defp attribute_code(%{name: name, property: property, primary_key?: primary_key?} = attribute) do
+    {type, constraints} =
+      case attribute.type do
+        nil -> type(property, name)
+        type -> {inspect(type), nil}
+      end
 
     options =
       [

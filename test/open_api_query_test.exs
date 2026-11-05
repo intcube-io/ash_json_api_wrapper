@@ -97,6 +97,7 @@ defmodule AshJsonApiWrapper.OpenApi.QueryTest do
         config(
           rename: [name: :title],
           skip: [:tags],
+          types: [stock_level: :decimal],
           filterable: [category: [:eq, :in]],
           fields: [price: [member: "unitPrice"]]
         ),
@@ -104,6 +105,7 @@ defmodule AshJsonApiWrapper.OpenApi.QueryTest do
       )
 
     assert code =~ "attribute :title, :string"
+    assert code =~ "attribute :stock_level, :decimal"
     assert code =~ ~r/field :title do\s+path "\$.name"/
     refute code =~ "attribute :tags"
     assert code =~ ~r/field :category do\s+filter_operators \[:eq, :in\]/
