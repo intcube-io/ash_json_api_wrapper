@@ -74,6 +74,9 @@ defmodule AshJsonApiWrapper.OpenApi.ResourceGenerator do
     `filter_operators []`, so Ash rejects filters the API would not accept
   * `:relationships` - `[belongs_to: [name: opts], has_many: [...]]`, written
     into a `relationships` block as given
+  * `:response_keys` - `:spec` (default) reads each field from the key the spec
+    names; `:dialect` trusts the dialect's naming instead (`response_case`), for
+    specs that document the response keys wrongly
   * `:types` - `[field: ash_type]` where the spec's type is too loose (a date sent
     as a plain string)
   * `:fields` - any `field` options of the data layer per attribute
@@ -537,9 +540,10 @@ defmodule AshJsonApiWrapper.OpenApi.ResourceGenerator do
         attribute_name
       end
 
-    if response_key != name and !Keyword.has_key?(field_options, :path),
-      do: [path: "$.#{name}"],
-      else: []
+    if context.config[:response_keys] != :dialect and response_key != name and
+         !Keyword.has_key?(field_options, :path),
+       do: [path: "$.#{name}"],
+       else: []
   end
 
   defp member_options(_name, _attribute_name, _field_options, %{hints: nil}), do: []

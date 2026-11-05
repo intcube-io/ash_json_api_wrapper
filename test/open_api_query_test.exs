@@ -146,6 +146,28 @@ defmodule AshJsonApiWrapper.OpenApi.QueryTest do
     assert code =~ "total: false"
   end
 
+  test "response_keys: :dialect ignores the spec's key names" do
+    config = [
+      dialect: AshJsonApiWrapper.Dialect.CubeJs,
+      resources: [
+        "Inventory.Product": [
+          path: "/api/products",
+          primary_key: "product_id",
+          response_keys: :dialect
+        ]
+      ]
+    ]
+
+    refute code(config, :"Inventory.Product") =~ ~s(path "$.product_id")
+
+    assert code(
+             Keyword.delete(config, :dialect)
+             |> Keyword.put(:dialect, AshJsonApiWrapper.Dialect.CubeJs)
+             |> put_in([:resources, :"Inventory.Product", :response_keys], :spec),
+             :"Inventory.Product"
+           ) =~ ~s(path "$.product_id")
+  end
+
   test "regenerating gives the same code" do
     assert code(config(rename: [name: :title]), :"Inventory.Product") ==
              code(config(rename: [name: :title]), :"Inventory.Product")
