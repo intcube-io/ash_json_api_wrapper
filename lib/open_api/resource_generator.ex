@@ -301,6 +301,7 @@ defmodule AshJsonApiWrapper.OpenApi.ResourceGenerator do
     raise ArgumentError, "operation without operationId: #{inspect(operation)}"
   end
 
+  # sobelow_skip ["DOS.StringToAtom"]
   defp endpoints(operations, entity_path, config) do
     Enum.map_join(operations, "\n\n", fn {path, method, operation, type} ->
       action = String.to_atom(operation_id(operation))
@@ -528,6 +529,7 @@ defmodule AshJsonApiWrapper.OpenApi.ResourceGenerator do
     }
   end
 
+  # sobelow_skip ["DOS.StringToAtom"]
   defp path_option(name, attribute_name, field_options, context) do
     response_key =
       if function_exported?(context.dialect, :response_key, 3) do
@@ -576,6 +578,7 @@ defmodule AshJsonApiWrapper.OpenApi.ResourceGenerator do
     end
   end
 
+  # sobelow_skip ["DOS.StringToAtom"]
   defp operator_options(name, attribute_name, property, field_options, context) do
     cond do
       Keyword.has_key?(field_options, :filter_operators) ->
@@ -626,6 +629,7 @@ defmodule AshJsonApiWrapper.OpenApi.ResourceGenerator do
     |> Enum.uniq()
   end
 
+  # sobelow_skip ["DOS.StringToAtom"]
   defp validate_overrides!(resource, config, attributes, path_params) do
     known = Enum.flat_map(attributes, &[&1.spec_name, &1.name])
 
@@ -750,6 +754,7 @@ defmodule AshJsonApiWrapper.OpenApi.ResourceGenerator do
 
   # ── relationships ──
 
+  # sobelow_skip ["DOS.StringToAtom", "DOS.ModuleConcat"]
   defp relationships_block(config, properties, attributes) do
     from_config =
       for {type, relationships} <- config[:relationships] || [],
