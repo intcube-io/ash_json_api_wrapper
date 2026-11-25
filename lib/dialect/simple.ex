@@ -409,9 +409,16 @@ defmodule AshJsonApiWrapper.Dialect.Simple do
          entity_callback,
          bodies
        ) do
-    case module.continue(body, Enum.at(bodies, 0), opts) do
+    case module.continue(
+           body,
+           Enum.at(bodies, 0),
+           Keyword.put(opts, :pages_fetched, length(bodies))
+         ) do
       :halt ->
         {:ok, bodies}
+
+      {:error, error} ->
+        {:error, error}
 
       {:ok, instructions} ->
         query = apply_instructions(paginate_with, instructions)
